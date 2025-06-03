@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>今日の禅語 | 気分に合った禅語を提案</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700&family=Noto+Serif+JP:wght@400;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>今日の禅語</h1>
+      <p class="subtitle">あなたの今日の気分に合った禅語を提案します</p>
+    </header>
+
+    <main>
+      <div class="input-section">
+        <form id="mood-form">
+          <div class="form-group">
+            <label for="mood">今日の気分</label>
+            <input 
+              type="text" 
+              id="mood" 
+              placeholder="例: 疲れた、嬉しい、悩んでいる..." 
+              required
+            >
+          </div>
+          <button type="submit" id="submit-btn">禅語を探す</button>
+        </form>
+        <p id="error-message" class="error-message"></p>
+      </div>
+
+      <div id="loading" class="loading hidden">
+        <div class="spinner"></div>
+        <p>禅語を探しています...</p>
+      </div>
+
+      <div id="result" class="result-section hidden">
+        <div class="zen-card">
+          <h2 id="zen-word"></h2>
+          <p id="reading" class="reading"></p>
+          <div class="section">
+            <h3>意味</h3>
+            <p id="meaning"></p>
+          </div>
+          <div class="section">
+            <h3>選定理由</h3>
+            <p id="reason"></p>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <footer>
+      <p>&copy; <span id="current-year"></span> 今日の禅語</p>
+    </footer>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
