@@ -14,7 +14,14 @@ document.addEventListener('DOMContentLoaded', () => {
   const meaningElement = document.getElementById('meaning');
   const reasonElement = document.getElementById('reason');
   
-  // API calls are now handled by the Netlify Function
+  // Google Gemini API key
+  const API_KEY = 'AIzaSyC7wyAmTEsJRfwEcz6pJciy5O8tkXToor0';
+  
+  // CORS proxy URL
+  const CORS_PROXY = 'https://corsproxy.io/?';
+  
+  // Gemini API endpoint
+  const GEMINI_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent';
   
   // Handle form submission
   form.addEventListener('submit', async (e) => {
@@ -75,39 +82,104 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
   
-  // Function to get zen phrase using Netlify Function
+  // Function to get zen phrase directly from Gemini API using CORS proxy
   async function getZenPhrase(mood) {
     try {
-      console.log('Sending request to Netlify Function with mood:', mood);
+      console.log('Sending request to Gemini API with mood:', mood);
       
-      // Call our Netlify Function instead of directly calling the Gemini API
-      const response = await fetch('/.netlify/functions/zen', {
+      // Prepare the prompt for Gemini
+      const prompt = `
+あなたは禅語に精通した仏教研究者です。利用者の「今日の気分」に合った禅語を一つ選び、
+「禅語・読み方・意味・選定理由」の4項目を、以下のフォーマットに従って日本語で返してください。
+
+必ず以下の4つすべてを含めてください：
+- 禅語（例: 喫茶去）
+- 読み方（ひらがな or カタカナ、例: きっさこ）
+- 意味（120字以内でその禅語の意味や背景を説明）
+- 選定理由（入力された気分に対してなぜこの禅語がふさわしいかを簡潔に説明）
+
+また、同じ気分が何度入力されても、できるだけ違う禅語を毎回提示してください。
+
+今日の気分: ${mood}
+
+# 出力フォーマット（JSON形式で返してください）
+{
+  "zenWord": "<禅語>",
+  "reading": "<読み方>",
+  "meaning": "<禅語の簡潔な説明（120字以内）>",
+  "reason": "<なぜこの気分にこの禅語が合っているのか（簡潔に）>"
+}
+`;
+      
+      // Use CORS proxy to avoid CORS issues
+      const proxyUrl = CORS_PROXY + encodeURIComponent(`${GEMINI_ENDPOINT}?key=${API_KEY}`);
+      
+      // Call Gemini API directly through CORS proxy
+      const response = await fetch(proxyUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ mood })
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                {
+                  text: prompt
+                }
+              ]
+            }
+          ],
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 1024
+          }
+        })
       });
       
       console.log('Response status:', response.status);
       
-      // Try to parse the response as JSON, even if it's an error
-      const responseData = await response.json();
-      console.log('Response data:', responseData);
+      // Try to parse the response as JSON
+      const data = await response.json();
+      console.log('API response:', data);
       
       if (!response.ok) {
-        console.error('Function error:', responseData);
-        throw new Error(responseData.error || 'API request failed');
+        console.error('API error:', data);
+        throw new Error('API request failed');
       }
       
-      // Validate the response data
-      if (!responseData.zenWord || !responseData.reading || !responseData.meaning || !responseData.reason) {
-        console.error('Invalid response data:', responseData);
-        throw new Error('Invalid response from server');
+      // Extract the response text
+      if (!data.candidates || !data.candidates[0] || !data.candidates[0].content || !data.candidates[0].content.parts || !data.candidates[0].content.parts[0]) {
+        console.error('Unexpected API response structure:', data);
+        throw new Error('Unexpected API response structure');
       }
       
-      // Return the JSON response directly
-      return responseData;
+      const responseText = data.candidates[0].content.parts[0].text;
+      console.log('Response text:', responseText);
+      
+      // Parse the JSON from the response
+      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+      
+      if (!jsonMatch) {
+        console.error('Failed to parse JSON from response:', responseText);
+        throw new Error('Failed to parse response from AI');
+      }
+      
+      try {
+        const zenData = JSON.parse(jsonMatch[0]);
+        console.log('Parsed zen data:', zenData);
+        
+        // Validate the parsed data
+        if (!zenData.zenWord || !zenData.reading || !zenData.meaning || !zenData.reason) {
+          console.error('Missing required fields in parsed data:', zenData);
+          throw new Error('Missing required fields in response');
+        }
+        
+        return zenData;
+      } catch (parseError) {
+        console.error('Error parsing JSON from response text:', parseError);
+        throw new Error('Failed to parse JSON from response');
+      }
     } catch (error) {
       console.error('API call error:', error);
       throw new Error(error.message || 'API request failed');
