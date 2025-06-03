@@ -51,7 +51,23 @@ document.addEventListener('DOMContentLoaded', () => {
       resultElement.classList.remove('hidden');
     } catch (error) {
       console.error('Error:', error);
-      errorMessage.textContent = 'エラーが発生しました。もう一度お試しください。';
+      
+      // Display detailed error message
+      resultElement.classList.add('hidden');
+      
+      // Show more detailed error message if available
+      let errorMessageText = 'エラーが発生しました。もう一度お試しください。';
+      if (error.message) {
+        // For development, show detailed error
+        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+          errorMessageText += `<br><small>詳細: ${error.message}</small>`;
+        }
+        // Log the detailed error to console regardless
+        console.error('Error details:', error.message);
+      }
+      
+      errorMessage.innerHTML = errorMessageText;
+      errorMessage.classList.remove('hidden');
     } finally {
       // Hide loading
       loadingElement.classList.add('hidden');
@@ -62,6 +78,8 @@ document.addEventListener('DOMContentLoaded', () => {
   // Function to get zen phrase using Netlify Function
   async function getZenPhrase(mood) {
     try {
+      console.log('Sending request to Netlify Function with mood:', mood);
+      
       // Call our Netlify Function instead of directly calling the Gemini API
       const response = await fetch('/.netlify/functions/zen', {
         method: 'POST',
@@ -71,17 +89,28 @@ document.addEventListener('DOMContentLoaded', () => {
         body: JSON.stringify({ mood })
       });
       
+      console.log('Response status:', response.status);
+      
+      // Try to parse the response as JSON, even if it's an error
+      const responseData = await response.json();
+      console.log('Response data:', responseData);
+      
       if (!response.ok) {
-        const errorData = await response.json();
-        console.error('Function error:', errorData);
-        throw new Error('API request failed');
+        console.error('Function error:', responseData);
+        throw new Error(responseData.error || 'API request failed');
+      }
+      
+      // Validate the response data
+      if (!responseData.zenWord || !responseData.reading || !responseData.meaning || !responseData.reason) {
+        console.error('Invalid response data:', responseData);
+        throw new Error('Invalid response from server');
       }
       
       // Return the JSON response directly
-      return await response.json();
+      return responseData;
     } catch (error) {
       console.error('API call error:', error);
-      throw new Error('API request failed');
+      throw new Error(error.message || 'API request failed');
     }
   }
 });

@@ -1,4 +1,7 @@
 // Netlify Function for proxying requests to Google Gemini API
+// Import node-fetch explicitly
+const fetch = require('node-fetch');
+
 exports.handler = async function(event, context) {
   // Only allow POST requests
   if (event.httpMethod !== 'POST') {
@@ -50,41 +53,70 @@ exports.handler = async function(event, context) {
 `;
 
     // Make request to Gemini API
-    const fetch = require('node-fetch');
-    const response = await fetch(`${endpoint}?key=${API_KEY}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              {
-                text: prompt
-              }
-            ]
+    console.log('Sending request to Gemini API with mood:', mood);
+    let response;
+    try {
+      response = await fetch(`${endpoint}?key=${API_KEY}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [
+                {
+                  text: prompt
+                }
+              ]
+            }
+          ],
+          generationConfig: {
+            temperature: 0.7,
+            maxOutputTokens: 1024
           }
-        ],
-        generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: 1024
-        }
-      })
-    });
+        })
+      });
+    } catch (fetchError) {
+      console.error('Fetch error:', fetchError);
+      return {
+        statusCode: 500,
+        body: JSON.stringify({ error: 'Failed to connect to Gemini API', details: fetchError.message })
+      };
+    }
 
-    const data = await response.json();
+    let data;
+    try {
+      data = await response.json();
+      console.log('API response:', JSON.stringify(data));
+    } catch (jsonError) {
+      console.error('Error parsing JSON response:', jsonError);
+      return {
+        statusCode: 500,
+        body: JSON.stringify({ error: 'Failed to parse API response', details: jsonError.message })
+      };
+    }
     
     if (!response.ok) {
       console.error('API error:', data);
       return {
         statusCode: response.status,
-        body: JSON.stringify({ error: 'Failed to get response from AI' })
+        body: JSON.stringify({ error: 'Failed to get response from AI', details: data })
+      };
+    }
+    
+    // Check if the response has the expected structure
+    if (!data.candidates || !data.candidates[0] || !data.candidates[0].content || !data.candidates[0].content.parts || !data.candidates[0].content.parts[0]) {
+      console.error('Unexpected API response structure:', data);
+      return {
+        statusCode: 500,
+        body: JSON.stringify({ error: 'Unexpected API response structure', details: data })
       };
     }
     
     // Extract the response text
     const responseText = data.candidates[0].content.parts[0].text;
+    console.log('Response text:', responseText);
     
     // Parse the JSON from the response
     // We need to extract just the JSON part from the response
@@ -94,11 +126,30 @@ exports.handler = async function(event, context) {
       console.error('Failed to parse JSON from response:', responseText);
       return {
         statusCode: 500,
-        body: JSON.stringify({ error: 'Failed to parse response from AI' })
+        body: JSON.stringify({ error: 'Failed to parse response from AI', responseText })
       };
     }
     
-    const zenData = JSON.parse(jsonMatch[0]);
+    let zenData;
+    try {
+      zenData = JSON.parse(jsonMatch[0]);
+      console.log('Parsed zen data:', zenData);
+    } catch (parseError) {
+      console.error('Error parsing JSON from response text:', parseError, 'Response text:', responseText);
+      return {
+        statusCode: 500,
+        body: JSON.stringify({ error: 'Failed to parse JSON from response', details: parseError.message, responseText })
+      };
+    }
+    
+    // Validate the parsed data
+    if (!zenData.zenWord || !zenData.reading || !zenData.meaning || !zenData.reason) {
+      console.error('Missing required fields in parsed data:', zenData);
+      return {
+        statusCode: 500,
+        body: JSON.stringify({ error: 'Missing required fields in response', zenData })
+      };
+    }
     
     // Return the Zen phrase data
     return {
