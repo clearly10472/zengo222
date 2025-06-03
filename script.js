@@ -14,8 +14,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const meaningElement = document.getElementById('meaning');
   const reasonElement = document.getElementById('reason');
   
-  // Google Gemini API key
-  const API_KEY = 'AIzaSyC7wyAmTEsJRfwEcz6pJciy5O8tkXToor0';
+  // API calls are now handled by the Netlify Function
   
   // Handle form submission
   form.addEventListener('submit', async (e) => {
@@ -60,75 +59,29 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
   
-  // Function to get zen phrase from Gemini API
+  // Function to get zen phrase using Netlify Function
   async function getZenPhrase(mood) {
-    // Gemini API endpoint
-    const endpoint = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent';
-    
-    // Prepare the prompt for Gemini
-    const prompt = `
-あなたは禅語に精通した仏教研究者です。利用者の「今日の気分」に合った禅語を一つ選び、
-「禅語・読み方・意味・選定理由」の4項目を、以下のフォーマットに従って日本語で返してください。
-
-必ず以下の4つすべてを含めてください：
-- 禅語（例: 喫茶去）
-- 読み方（ひらがな or カタカナ、例: きっさこ）
-- 意味（120字以内でその禅語の意味や背景を説明）
-- 選定理由（入力された気分に対してなぜこの禅語がふさわしいかを簡潔に説明）
-
-また、同じ気分が何度入力されても、できるだけ違う禅語を毎回提示してください。
-
-今日の気分: ${mood}
-
-# 出力フォーマット（JSON形式で返してください）
-{
-  "zenWord": "<禅語>",
-  "reading": "<読み方>",
-  "meaning": "<禅語の簡潔な説明（120字以内）>",
-  "reason": "<なぜこの気分にこの禅語が合っているのか（簡潔に）>"
-}
-`;
-
-    // Make request to Gemini API
-    const response = await fetch(`${endpoint}?key=${API_KEY}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              {
-                text: prompt
-              }
-            ]
-          }
-        ],
-        generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: 1024
-        }
-      })
-    });
-    
-    if (!response.ok) {
+    try {
+      // Call our Netlify Function instead of directly calling the Gemini API
+      const response = await fetch('/.netlify/functions/zen', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ mood })
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Function error:', errorData);
+        throw new Error('API request failed');
+      }
+      
+      // Return the JSON response directly
+      return await response.json();
+    } catch (error) {
+      console.error('API call error:', error);
       throw new Error('API request failed');
     }
-    
-    const data = await response.json();
-    
-    // Extract the response text
-    const responseText = data.candidates[0].content.parts[0].text;
-    
-    // Parse the JSON from the response
-    // We need to extract just the JSON part from the response
-    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-    
-    if (!jsonMatch) {
-      throw new Error('Failed to parse JSON from response');
-    }
-    
-    return JSON.parse(jsonMatch[0]);
   }
 });
