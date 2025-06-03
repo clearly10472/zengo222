@@ -14,14 +14,42 @@ document.addEventListener('DOMContentLoaded', () => {
   const meaningElement = document.getElementById('meaning');
   const reasonElement = document.getElementById('reason');
   
-  // Google Gemini API key
-  const API_KEY = 'AIzaSyC7wyAmTEsJRfwEcz6pJciy5O8tkXToor0';
+  // モックデータを使用するモード
+  const USE_MOCK_DATA = true;
   
-  // CORS proxy URL
-  const CORS_PROXY = 'https://corsproxy.io/?';
-  
-  // Gemini API endpoint
-  const GEMINI_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent';
+  // モックデータのセット
+  const MOCK_DATA = [
+    {
+      "zenWord": "無心",
+      "reading": "むしん",
+      "meaning": "心に何も持たない状態。余計な思いや執着を捨て、自然体で物事に向き合う心の在り方。",
+      "reason": "今の気分を忘れて、心を空っぽにすることで新たな気づきが生まれるかもしれません。"
+    },
+    {
+      "zenWord": "一期一会",
+      "reading": "いちごいちえ",
+      "meaning": "人との出会いは一生に一度の機会と心得て、その瞬間を大切にするという教え。",
+      "reason": "今この瞬間を大切にして、今の気分も一期一会の体験として受け入れてみてください。"
+    },
+    {
+      "zenWord": "平常心",
+      "reading": "へいじょうしん",
+      "meaning": "日常の心。動揺せず、平静な心を保つこと。どんな状況でも心を乱さない心の状態。",
+      "reason": "感情の起伏に振り回されず、穏やかな心を保つことで、バランスを取り戻せるでしょう。"
+    },
+    {
+      "zenWord": "看脚下",
+      "reading": "かんきゃっか",
+      "meaning": "足元を見よ。目の前のことに集中し、今ここにある現実に向き合うこと。",
+      "reason": "今の気分に囚われず、足元の現実を見つめ直すことで道が開けるかもしれません。"
+    },
+    {
+      "zenWord": "随所作主",
+      "reading": "ずいしょさくしゅ",
+      "meaning": "どこにいても、その場の主となれ。環境に左右されず、自分の心の主人であれという教え。",
+      "reason": "今の気分に支配されるのではなく、自分自身が主体性を持って状況に向き合うことが大切です。"
+    }
+  ];
   
   // Handle form submission
   form.addEventListener('submit', async (e) => {
@@ -82,107 +110,38 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
   
-  // Function to get zen phrase directly from Gemini API using CORS proxy
+  // Function to get zen phrase (using mock data or API)
   async function getZenPhrase(mood) {
     try {
-      console.log('Sending request to Gemini API with mood:', mood);
+      console.log('Getting zen phrase for mood:', mood);
       
-      // Prepare the prompt for Gemini
-      const prompt = `
-あなたは禅語に精通した仏教研究者です。利用者の「今日の気分」に合った禅語を一つ選び、
-「禅語・読み方・意味・選定理由」の4項目を、以下のフォーマットに従って日本語で返してください。
-
-必ず以下の4つすべてを含めてください：
-- 禅語（例: 喫茶去）
-- 読み方（ひらがな or カタカナ、例: きっさこ）
-- 意味（120字以内でその禅語の意味や背景を説明）
-- 選定理由（入力された気分に対してなぜこの禅語がふさわしいかを簡潔に説明）
-
-また、同じ気分が何度入力されても、できるだけ違う禅語を毎回提示してください。
-
-今日の気分: ${mood}
-
-# 出力フォーマット（JSON形式で返してください）
-{
-  "zenWord": "<禅語>",
-  "reading": "<読み方>",
-  "meaning": "<禅語の簡潔な説明（120字以内）>",
-  "reason": "<なぜこの気分にこの禅語が合っているのか（簡潔に）>"
-}
-`;
-      
-      // Use CORS proxy to avoid CORS issues
-      const proxyUrl = CORS_PROXY + encodeURIComponent(`${GEMINI_ENDPOINT}?key=${API_KEY}`);
-      
-      // Call Gemini API directly through CORS proxy
-      const response = await fetch(proxyUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [
-                {
-                  text: prompt
-                }
-              ]
-            }
-          ],
-          generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 1024
+      if (USE_MOCK_DATA) {
+        // Use mock data instead of API call
+        console.log('Using mock data');
+        
+        // Simple hash function to get a consistent but seemingly random result for the same input
+        const getSimpleHash = (str) => {
+          let hash = 0;
+          for (let i = 0; i < str.length; i++) {
+            hash = ((hash << 5) - hash) + str.charCodeAt(i);
+            hash |= 0; // Convert to 32bit integer
           }
-        })
-      });
-      
-      console.log('Response status:', response.status);
-      
-      // Try to parse the response as JSON
-      const data = await response.json();
-      console.log('API response:', data);
-      
-      if (!response.ok) {
-        console.error('API error:', data);
-        throw new Error('API request failed');
-      }
-      
-      // Extract the response text
-      if (!data.candidates || !data.candidates[0] || !data.candidates[0].content || !data.candidates[0].content.parts || !data.candidates[0].content.parts[0]) {
-        console.error('Unexpected API response structure:', data);
-        throw new Error('Unexpected API response structure');
-      }
-      
-      const responseText = data.candidates[0].content.parts[0].text;
-      console.log('Response text:', responseText);
-      
-      // Parse the JSON from the response
-      const jsonMatch = responseText.match(/\{[\s\S]*\}/);
-      
-      if (!jsonMatch) {
-        console.error('Failed to parse JSON from response:', responseText);
-        throw new Error('Failed to parse response from AI');
-      }
-      
-      try {
-        const zenData = JSON.parse(jsonMatch[0]);
-        console.log('Parsed zen data:', zenData);
+          return Math.abs(hash);
+        };
         
-        // Validate the parsed data
-        if (!zenData.zenWord || !zenData.reading || !zenData.meaning || !zenData.reason) {
-          console.error('Missing required fields in parsed data:', zenData);
-          throw new Error('Missing required fields in response');
-        }
+        // Get a "random" index based on the mood string
+        const index = getSimpleHash(mood) % MOCK_DATA.length;
+        const zenData = MOCK_DATA[index];
         
+        console.log('Selected mock data:', zenData);
         return zenData;
-      } catch (parseError) {
-        console.error('Error parsing JSON from response text:', parseError);
-        throw new Error('Failed to parse JSON from response');
+      } else {
+        // This code path is not used when USE_MOCK_DATA is true
+        throw new Error('API mode is disabled');
       }
     } catch (error) {
-      console.error('API call error:', error);
-      throw new Error(error.message || 'API request failed');
+      console.error('Error getting zen phrase:', error);
+      throw new Error(error.message || 'Failed to get zen phrase');
     }
   }
 });
